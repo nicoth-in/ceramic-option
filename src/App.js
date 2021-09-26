@@ -1,5 +1,6 @@
 
 import './App.css';
+
 import {
   BrowserRouter,
   Switch,
@@ -8,26 +9,21 @@ import {
 } from "react-router-dom";
 
 import {
-
-  useQuery,
-
-  useMutation,
-
-  useQueryClient,
-
   QueryClient,
-
   QueryClientProvider,
-
 } from 'react-query';
 
-import ThreeIdResolver from '@ceramicnetwork/3id-did-resolver';
+import { Web3Provider, Web3Service } from "../components/use-web3";
+import WalletConnectProvider from "@walletconnect/web3-provider";
+import { EthereumAuthProvider } from "@ceramicnetwork/blockchain-utils-linking";
+import { CeramicProvider, CeramicService, Networks } from "use-ceramic";
 
-import { Resolver } from 'did-resolver';
-import CeramicClient from '@ceramicnetwork/http-client';
-import { DID } from 'dids';
 import Auth from "./Auth/View";
 
+import { API } from "./API";
+
+
+export const api = new API();
 // import { ThreeIdConnect, EthereumAuthProvider } from '@3id/connect';
 
 
@@ -54,15 +50,15 @@ import Auth from "./Auth/View";
 // }
 
 
-const API_URL = 'https://gateway-clay.ceramic.network';
-export const ceramic = new CeramicClient(API_URL)
+// const API_URL = 'https://gateway-clay.ceramic.network';
+// export const ceramic = new CeramicClient(API_URL)
 
-const threeIdResolver = ThreeIdResolver.getResolver(ceramic);
-const didResolver = new Resolver(threeIdResolver);
+// const threeIdResolver = ThreeIdResolver.getResolver(ceramic);
+// const didResolver = new Resolver(threeIdResolver);
 
 
-const did = new DID({ resolver: didResolver })
-ceramic.did = did;
+// const did = new DID({ resolver: didResolver })
+// ceramic.did = did;
 
 // const test = async () => {
 
@@ -90,15 +86,47 @@ ceramic.did = did;
 
 export const queryClient = new QueryClient();
 
+const web3Service = new Web3Service({
+  network: "ropsten",
+  cacheProvider: false,
+  providerOptions: {
+    injected: {
+      package: null,
+    },
+    walletconnect: {
+      package: WalletConnectProvider,
+      options: {
+        infuraId: "b407db983da44def8a68e3fdb6bea776",
+      },
+    },
+  },
+});
+
+const ceramicService = new CeramicService(
+  Networks.DEV_UNSTABLE,
+  "https://ceramic-dev.3boxlabs.com"
+);
+
+ceramicService.connect = async () => {
+  await web3Service.connect();
+  const provider = web3Service.provider;
+  const web3 = web3Service.web3;
+  const accounts = await web3.eth.getAccounts();
+  return new EthereumAuthProvider(provider, accounts[0]);
+};
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-          <Route exact path="/" component={Auth} />
-          <Route exact path="/profile/:did" component={Auth} />
-          {/* <Link to="/dashboard/" /> */}
-      </BrowserRouter>
+      <Web3Provider service={web3Service}>
+        <CeramicProvider service={ceramicService}>
+          <BrowserRouter>
+            <Route exact path="/" component={Auth} />
+            <Route exact path="/profile/:did" component={Auth} />
+            {/* <Link to="/dashboard/" /> */}
+          </BrowserRouter>
+        </CeramicProvider>
+      </Web3Provider>
     </QueryClientProvider>
 
   );
